@@ -1,5 +1,3 @@
-import { prepare } from "https://deno.land/x/plug@0.5.2/plug.ts";
-import meta from "../deno.json" assert { type: "json" };
 
 const symbols = {
   sqlite3_open_v2: {
@@ -98,7 +96,7 @@ const symbols = {
   sqlite3_column_type: {
     parameters: [
       "pointer", // sqlite3_stmt *pStmt
-      "pointer", // int iCol
+      "i32", // int iCol
     ],
     result: "i32",
   },
@@ -108,7 +106,7 @@ const symbols = {
       "pointer", // sqlite3_stmt *pStmt
       "i32", // int iCol
     ],
-    result: "u64",
+    result: "pointer",
   },
 
   sqlite3_finalize: {
@@ -157,7 +155,7 @@ const symbols = {
       "pointer", // sqlite3_stmt *pStmt
       "i32", // int iCol
     ],
-    result: "u64",
+    result: "pointer",
   },
 
   sqlite3_column_bytes: {
@@ -173,7 +171,7 @@ const symbols = {
       "pointer", // sqlite3_stmt *pStmt
       "i32", // int iCol
     ],
-    result: "u64",
+    result: "pointer",
   },
 
   sqlite3_column_decltype: {
@@ -181,7 +179,7 @@ const symbols = {
       "pointer", // sqlite3_stmt *pStmt
       "i32", // int iCol
     ],
-    result: "u64",
+    result: "pointer",
   },
 
   sqlite3_bind_parameter_index: {
@@ -253,7 +251,7 @@ const symbols = {
     parameters: [
       "pointer", // sqlite3_stmt *pStmt
     ],
-    result: "u64",
+    result: "pointer",
   },
 
   sqlite3_bind_parameter_count: {

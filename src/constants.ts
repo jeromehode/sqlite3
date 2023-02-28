@@ -65,3 +65,7 @@ export const SQLITE_FLOAT = 2;
 export const SQLITE_TEXT = 3;
 export const SQLITE_BLOB = 4;
 export const SQLITE_NULL = 5;
+
+
+export const SQLITE_TRANSIENT= Deno.UnsafePointer.create(-1);
+export const SQLITE_STATIC= null;

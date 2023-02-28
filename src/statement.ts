@@ -167,11 +167,11 @@ export class Statement {
         toCString(sql),
         sql.length,
         pHandle,
-        0,
+        null,
       ),
       db.unsafeHandle,
     );
-    this.#handle = pHandle[0] + 2 ** 32 * pHandle[1];
+    this.#handle = Deno.UnsafePointer.create(pHandle[0] + 2 ** 32 * pHandle[1]);
     STATEMENTS.set(this.#handle, db.unsafeHandle);
     this.#unsafeConcurrency = db.unsafeConcurrency;
     this.#finalizerToken = { handle: this.#handle };
@@ -267,13 +267,13 @@ export class Statement {
           // of an empty string. As a workaround let's use a special
           // non-empty buffer, but specify zero length.
           unwrap(
-            sqlite3_bind_text(this.#handle, i + 1, emptyStringBuffer, 0, 0),
+            sqlite3_bind_text(this.#handle, i + 1, emptyStringBuffer, 0, null),
           );
         } else {
           const str = new TextEncoder().encode(param);
           this.#bindRefs.add(str);
           unwrap(
-            sqlite3_bind_text(this.#handle, i + 1, str, str.byteLength, 0),
+            sqlite3_bind_text(this.#handle, i + 1, str, str.byteLength, null),
           );
         }
         break;
@@ -289,7 +289,7 @@ export class Statement {
               i + 1,
               param,
               param.byteLength,
-              0,
+              null,
             ),
           );
         } else if (param instanceof Date) {
@@ -301,7 +301,7 @@ export class Statement {
               i + 1,
               cstring,
               -1,
-              0,
+              null,
             ),
           );
         } else {
@@ -394,18 +394,18 @@ export class Statement {
     const columnCount = sqlite3_column_count(this.#handle);
     const result: T[] = [];
     const getRowArray = new Function(
-      "getColumn",
+      "getColumn","handle",
       `
       return function() {
         return [${
         Array.from({ length: columnCount }).map((_, i) =>
-          `getColumn(${this.#handle}, ${i}, ${this.db.int64})`
+          `getColumn(handle, ${i}, ${this.db.int64})`
         )
           .join(", ")
       }];
       };
       `,
-    )(getColumn);
+    )(getColumn,this.#handle);
     const step = this.callback ? sqlite3_step_cb : sqlite3_step;
     let status = step(this.#handle);
     while (status === SQLITE3_ROW) {
@@ -429,18 +429,18 @@ export class Statement {
     const columnCount = sqlite3_column_count(this.#handle);
     const result: T[] = [];
     const getRowArray = new Function(
-      "getColumn",
+      "getColumn","handle",
       `
       return function() {
         return [${
         Array.from({ length: columnCount }).map((_, i) =>
-          `getColumn(${this.#handle}, ${i}, ${this.db.int64})`
+          `getColumn(handle, ${i}, ${this.db.int64})`
         )
           .join(", ")
       }];
       };
       `,
-    )(getColumn);
+    )(getColumn,this.#handle);
     const step = this.callback ? sqlite3_step_cb : sqlite3_step;
     let status = step(this.#handle);
     while (status === SQLITE3_ROW) {
@@ -458,19 +458,19 @@ export class Statement {
     if (!this.#rowObjectFn || !this.#unsafeConcurrency) {
       const columnNames = this.columnNames();
       const getRowObject = new Function(
-        "getColumn",
+        "getColumn","handle",
         `
         return function() {
           return {
             ${
           columnNames.map((name, i) =>
-            `"${name}": getColumn(${this.#handle}, ${i}, ${this.db.int64})`
+            `"${name}": getColumn(handle, ${i}, ${this.db.int64})`
           ).join(",\n")
         }
           };
         };
         `,
-      )(getColumn);
+      )(getColumn,this.#handle);
       this.#rowObjectFn = getRowObject;
     }
     return this.#rowObjectFn!;

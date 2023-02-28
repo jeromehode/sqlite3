@@ -10,6 +10,8 @@ import {
   SQLITE_INTEGER,
   SQLITE_NULL,
   SQLITE_TEXT,
+	SQLITE_STATIC,
+	SQLITE_TRANSIENT,
 } from "./constants.ts";
 import { readCstr, toCString, unwrap } from "./util.ts";
 import { RestBindParameters, Statement, STATEMENTS } from "./statement.ts";
@@ -193,14 +195,14 @@ export class Database {
         flags |= SQLITE3_OPEN_READWRITE;
       }
 
-      if (options.create ?? true) {
+      if ((options.create ?? true) && !options.readonly) {
         flags |= SQLITE3_OPEN_CREATE;
       }
     }
 
     const pHandle = new Uint32Array(2);
-    const result = sqlite3_open_v2(toCString(this.#path), pHandle, flags, 0);
-    this.#handle = pHandle[0] + 2 ** 32 * pHandle[1];
+    const result = sqlite3_open_v2(toCString(this.#path), pHandle, flags, null);
+    this.#handle = Deno.UnsafePointer.create(pHandle[0] + 2 ** 32 * pHandle[1]);
     if (result !== 0) sqlite3_close_v2(this.#handle);
     unwrap(result);
   }
@@ -278,9 +280,9 @@ export class Database {
   exec(sql: string, ...params: RestBindParameters): number {
     if (params.length === 0) {
       const pErr = new Uint32Array(2);
-      sqlite3_exec(this.#handle, toCString(sql), 0, 0, pErr);
-      const errPtr = pErr[0] + 2 ** 32 * pErr[1];
-      if (errPtr !== 0) {
+      sqlite3_exec(this.#handle, toCString(sql), null, null, pErr);
+      const errPtr = Deno.UnsafePointer.create(pErr[0] + 2 ** 32 * pErr[1]);
+      if (errPtr !== null) {
         const err = readCstr(errPtr);
         sqlite3_free(errPtr);
         throw new Error(err);
@@ -384,7 +386,7 @@ export class Database {
         const argptr = new Deno.UnsafePointerView(pArgs);
         const args: any[] = [];
         for (let i = 0; i < nArgs; i++) {
-          const arg = Number(argptr.getBigUint64(i * 8));
+          const arg = Deno.unsafePointer.create(argptr.getBigUint64(i * 8));
           const type = sqlite3_value_type(arg);
           switch (type) {
             case SQLITE_INTEGER:
@@ -443,9 +445,9 @@ export class Database {
           sqlite3_result_int64(ctx, result);
         } else if (typeof result === "string") {
           const buffer = new TextEncoder().encode(result);
-          sqlite3_result_text(ctx, buffer, buffer.byteLength, 0);
+          sqlite3_result_text(ctx, buffer, buffer.byteLength, SQLITE_STATIC);
         } else if (result instanceof Uint8Array) {
-          sqlite3_result_blob(ctx, result, result.length, -1);
+          sqlite3_result_blob(ctx, result, result.length, SQLITE_TRANSIENT);
         } else {
           const buffer = new TextEncoder().encode(
             `Invalid return value: ${Deno.inspect(result)}`,
@@ -478,10 +480,10 @@ export class Database {
       toCString(name),
       options?.varargs ? -1 : fn.length,
       flags,
-      0,
+      null,
       cb.pointer,
-      0,
-      0,
+      null,
+      null,
     );
 
     unwrap(err, this.#handle);
@@ -514,7 +516,7 @@ export class Database {
         const argptr = new Deno.UnsafePointerView(pArgs);
         const args: any[] = [];
         for (let i = 0; i < nArgs; i++) {
-          const arg = Number(argptr.getBigUint64(i * 8));
+          const arg = Deno.unsafePointer.create(argptr.getBigUint64(i * 8));
           const type = sqlite3_value_type(arg);
           switch (type) {
             case SQLITE_INTEGER:
@@ -595,9 +597,9 @@ export class Database {
           sqlite3_result_int64(ctx, result);
         } else if (typeof result === "string") {
           const buffer = new TextEncoder().encode(result);
-          sqlite3_result_text(ctx, buffer, buffer.byteLength, 0);
+          sqlite3_result_text(ctx, buffer, buffer.byteLength, SQLITE_STATIC);
         } else if (result instanceof Uint8Array) {
-          sqlite3_result_blob(ctx, result, result.length, -1);
+          sqlite3_result_blob(ctx, result, result.length, SQLITE_TRANSIENT);
         } else {
           const buffer = new TextEncoder().encode(
             `Invalid return value: ${Deno.inspect(result)}`,
@@ -630,8 +632,8 @@ export class Database {
       toCString(name),
       options?.varargs ? -1 : options.step.length - 1,
       flags,
-      0,
-      0,
+      null,
+      null,
       cb.pointer,
       cbFinal.pointer,
     );
